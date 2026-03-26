@@ -4,3 +4,7 @@
 !.pixi/config.toml
 mutagen.yml*
 data
+cache
+experiments/*
+!experiments/config
+logs

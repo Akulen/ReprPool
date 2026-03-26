@@ -1,0 +1,68 @@
+name: REDDIT_MULTI_5K
+dataset: rdt-m5k
+lr: 7e-4
+batch_size: 4 #4
+vt_batch_size: 20
+epochs: 300
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 128
+  dropout: 0.0
+models:
+  - model: ClusterPooling
+    model_params:
+      n_gnn_layers: 5
+      pooling_freq: 2
+      dropout_pool: 0.0
+      head_n_linear: 2
+  # - model: UFPooling
+  #   model_params:
+  #     cluster_activation: tanh
+  # - model: UFPooling
+  #   model_params:
+  #     cluster_activation: sigmoid
+  - model: GNPooling
+    model_params:
+      n_gnn_layers: 5
+      pooling_freq: 2
+      dropout_pool: 0.0
+      head_n_linear: 2
+      cluster_activation: tanh
+      edge_mask: true
+  - model: GNPooling
+    model_params:
+      n_gnn_layers: 5
+      pooling_freq: 2
+      dropout_pool: 0.0
+      head_n_linear: 2
+      cluster_activation: tanh
+      edge_mask: false
+  # - model: GNNet
+  #   model_params:
+  #     n_layers: 2
+  #     edge_feat: false
+  #     readout: mean
+  #     hook_args:
+  #       num_heads: 1
+  #       dropout: 0.0
+  # - model: GNNet
+  #   model_params:
+  #     n_layers: 2
+  #     edge_feat: false
+  #     readout: sum
+  #     hook_args:
+  #       num_heads: 1
+  #       dropout: 0.0
+optimizer: adamw
+weight_decay: 1e-2
+scheduler: periodscale
+scheduler_params:
+  factor: 0.5
+  period: 80
+seed:
+  - 42
+  - 4242
+  - 424242

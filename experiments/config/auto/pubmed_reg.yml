@@ -1,0 +1,63 @@
+name: A_PUBMED_REG
+dataset: pubmed
+lr:
+  - 1e-3
+  - 5e-3
+  - 1e-2
+epochs: 200
+loss:
+  - CrossEntropy
+  - accuracy
+model: ReG
+model_params:
+  d_model:
+    - 32
+    - 40
+    - 48
+    - 64
+  dropout_feat:
+    - 0.05
+    - 0.08
+    - 0.1
+    - 0.15
+    - 0.2
+    - 0.8
+    - 0.85
+    - 0.9
+    - 0.92
+    - 0.95
+  dropout_adj:
+    - 0.05
+    - 0.08
+    - 0.2
+    - 0.8
+    - 0.92
+    - 0.95
+  max_depth:
+    - 5
+    - 10
+    - 20
+  reduction_factor:
+    - 2
+    - 10
+  activation:
+    - relu
+    - elu
+    - none
+  improved:
+    - true
+    - false
+  # aug_adj:
+  #   - true
+  #   - false
+optimizer: adamw
+weight_decay:
+  - 0
+  - 1e-4
+  - 1e-3
+  - 5e-3
+n_trials: 100
+seed:
+  - 42
+  - 123
+  # - 456

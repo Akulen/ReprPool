@@ -1,0 +1,43 @@
+name: REDDIT_MULTI_12K
+dataset: rdt-m12k
+lr: 2.5e-4
+batch_size: 4 #4
+vt_batch_size: 20
+epochs: 200
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 256
+  n_gnn_layers: 5
+  pooling_freq: 2
+  dropout: 0.025
+  dropout_pool: 0.025
+  head_n_linear: 2
+models:
+  - model: ClusterPooling
+  # - model: UFPooling
+  #   model_params:
+  #     cluster_activation: tanh
+  # - model: UFPooling
+  #   model_params:
+  #     cluster_activation: sigmoid
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: true
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: false
+optimizer: adamw
+weight_decay: 1e-2
+scheduler: periodscale
+scheduler_params:
+  factor: 0.5
+  period: 55
+seed:
+  - 42
+  - 4242
+  - 424242

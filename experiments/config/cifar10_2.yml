@@ -1,0 +1,91 @@
+name: CIFAR10_2
+dataset: cifar10
+lr: 1e-3
+batch_size: 128
+vt_batch_size: 5000
+epochs: 1000
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 110
+  dropout: 0.0
+  n_layers: 4
+  readout: sum
+  batch_norm: true
+  residual: true
+models:
+  - model: GINNet
+    model_params:
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+  - model: GINNet
+    model_params:
+      n_layers: 2
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+  - model: GNGINNet
+    model_params:
+      n_layers: 2
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+      hook_args:
+        num_heads: 1
+        dropout: 0.0
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      edge_feat: true
+      readout: mean
+  - model: GatedGCNNet
+    model_params:
+      n_layers: 2
+      d_model: 70
+      edge_feat: true
+      readout: mean
+  - model: GNNet
+    model_params:
+      n_layers: 2
+      d_model: 70
+      edge_feat: false
+      readout: mean
+      hook_args:
+        num_heads: 1
+        dropout: 0.0
+  - model: GNNet
+    model_params:
+      n_layers: 2
+      d_model: 70
+      edge_feat: true
+      readout: mean
+      hook_args:
+        num_heads: 1
+        dropout: 0.0
+        edge_feat: true
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      edge_feat: false
+      readout: mean
+  # - model: GNNet2
+  #   model_params:
+  #     n_layers: 2
+  #     d_model: 70
+  #     edge_feat: true
+  #     readout: mean
+  #     n_mlp_layers: 2
+  #     neighbor_aggr_type: sum
+optimizer: adam
+scheduler: reducelr
+scheduler_params:
+  factor: 0.5
+  patience: 20
+  min_lr: 1e-5
+seed:
+  - 42
+  - 4242
+  - 424242

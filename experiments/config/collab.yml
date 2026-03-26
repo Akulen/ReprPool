@@ -1,0 +1,37 @@
+name: COLLAB
+dataset: collab
+lr: 1e-3
+batch_size: 4
+vt_batch_size: 20
+epochs: 100
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 32
+  n_gnn_layers: 2
+  pooling_freq: 1
+  dropout: 0.5
+  dropout_pool: 0.5
+  head_n_linear: 1
+models:
+  - model: ClusterPooling
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: true
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: false
+optimizer: adamw
+weight_decay: 1e-2
+scheduler: periodscale
+scheduler_params:
+  factor: 0.5
+  period: 65
+seed:
+  - 42
+  - 4242
+  - 424242

@@ -1,0 +1,40 @@
+name: CITESEER
+dataset: citeseer
+epochs: 500
+loss:
+  - CrossEntropy
+  - accuracy
+models:
+  - model: GraphUNet
+    lr: 1e-3
+    weight_decay: 1e-3
+    model_params:
+      d_model: 64
+      dropout_feat: 0.8
+      dropout_adj: 0.92
+      ks: [2328, 1164, 582, 232]
+      activation: elu
+      improved: true
+      aug_adj: true
+  - model: ReG
+    lr: 1e-3
+    weight_decay: 1e-4
+    model_params:
+      d_model: 40
+      dropout_feat: 0.95
+      dropout_adj: 0.05
+      max_depth: 5
+      reduction_factor: 10
+      activation: elu
+      improved: true
+optimizer: adamw
+scheduler: periodscale
+scheduler_params:
+  period: 200
+  factor: 0.5
+seed:
+  - 42
+  - 4242
+  - 424242
+  - 42424242
+  - 4242424242

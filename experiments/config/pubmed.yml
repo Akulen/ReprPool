@@ -1,0 +1,41 @@
+name: PUBMED
+dataset: pubmed
+epochs: 500
+loss:
+  - CrossEntropy
+  - accuracy
+models:
+  - model: GraphUNet
+    lr: 1e-3
+    weight_decay: 1e-4
+    model_params:
+      d_model: 48
+      dropout_feat: 0.15
+      dropout_adj: 0.95
+      ks: [13801, 6900, 3450, 1380]
+      activation: relu
+      improved: true
+      aug_adj: true
+  # Old
+  - model: ReG
+    lr: 1e-2
+    weight_decay: 5e-3
+    model_params:
+      d_model: 40
+      dropout_feat: 0.9
+      dropout_adj: 0.08
+      max_depth: 20
+      reduction_factor: 10
+      activation: relu
+      improved: false
+optimizer: adamw
+scheduler: periodscale
+scheduler_params:
+  period: 200
+  scale: 0.5
+seed:
+  - 42
+  - 4242
+  - 424242
+  - 42424242
+  - 4242424242

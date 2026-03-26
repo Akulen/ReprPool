@@ -1,0 +1,40 @@
+name: CORA
+dataset: cora
+epochs: 500
+loss:
+  - CrossEntropy
+  - accuracy
+models:
+  - model: GraphUNet
+    lr: 1e-2
+    weight_decay: 5e-3
+    model_params:
+      d_model: 40
+      dropout_feat: 0.92
+      dropout_adj: 0.2
+      ks: [1895, 947, 473, 189]
+      activation: elu
+      improved: false
+      aug_adj: True
+  - model: ReG
+    lr: 5e-3
+    weight_decay: 1e-3
+    model_params:
+      d_model: 40
+      dropout_feat: 0.95
+      dropout_adj: 0.2
+      max_depth: 5
+      reduction_factor: 10
+      activation: elu
+      improved: false
+optimizer: adamw
+scheduler: periodscale
+scheduler_params:
+  period: 200
+  scale: 0.5
+seed:
+  - 42
+  - 4242
+  - 424242
+  - 42424242
+  - 4242424242

@@ -1,0 +1,37 @@
+name: NCI1
+dataset: nci1
+lr: 5e-3
+batch_size: 4
+vt_batch_size: 20
+epochs: 200
+test_frequency: 1
+loss:
+  - BCE
+  - accuracy
+model_params:
+  d_model: 128
+  n_gnn_layers: 2
+  pooling_freq: 1
+  dropout: 0.1
+  dropout_pool: 0.1
+  head_n_linear: 2
+models:
+  - model: ClusterPooling
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: true
+  - model: GNPooling
+    model_params:
+      cluster_activation: tanh
+      edge_mask: false
+optimizer: adamw
+weight_decay: 1e-2
+scheduler: periodscale
+scheduler_params:
+  factor: 0.5
+  period: 45
+seed:
+  - 42
+  - 4242
+  - 424242
