@@ -31,6 +31,18 @@ models:
     model_params:
       cluster_activation: tanh
       edge_mask: false
+  - model: DiffPool
+    model_params:
+      ks: [300, 200]
+  - model: MinCutPool
+    model_params:
+      ks: [300, 200]
+  - model: SAGPool
+    model_params:
+      ks: [300, 200]
+  - model: TopKPool
+    model_params:
+      ks: [300, 200]
 optimizer: adamw
 weight_decay: 1e-2
 scheduler: periodscale
@@ -41,3 +53,10 @@ seed:
   - 42
   - 4242
   - 424242
+  - 42424242
+  - 4242424242
+  - 424242424242
+  - 42424242424242
+  - 4242424242424242
+  - 424242424242424242
+  - 242424242424242424

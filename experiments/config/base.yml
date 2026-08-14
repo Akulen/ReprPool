@@ -1,0 +1,24 @@
+name: Base
+dataset: ogbg-molhiv
+lr: 1e-3
+batch_size: 64
+epochs: 500
+loss:
+  - dataset
+  - BCE
+model_params:
+  n_gnn_layers: 2
+  d_model: 64
+  dropout: 0.5
+models:
+  - model: GIN
+  # - model: UF
+  #   lr: 1e-2
+  # - model: UF
+  #   lr: 3e-3
+  - model: UF
+    lr: 1e-3
+seed:
+  - 42
+  - 4242
+  - 424242

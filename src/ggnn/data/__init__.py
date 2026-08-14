@@ -1,21 +1,62 @@
 import os
 import pickle
-from typing import TypeVar
 import hashlib
 import json
+from functools import partial
 
 from ggnn.data.dataset import Dataset
+from ggnn.data.ogbg import DSMolhiv
+from ggnn.data.synth import DSSynth
+from ggnn.data.mnist import DSMnist
+from ggnn.data.cifar10 import DSCifar10
+from ggnn.data.tudataset import DSRedditB, DSRedditM5K, DSRedditM12K, DSNCI1, DSCOLLAB
+from ggnn.data.node import DSCora, DSCiteseer, DSPubMed
+
+from benchmarking.data.superpixels import SuperPixDataset
+
+def get_dataset(name: str) -> type[Dataset]:
+    match name:
+        case 'ogbg-molhiv':
+            return DSMolhiv
+        case 'synth':
+            return DSSynth
+        case 'mnist':
+            return DSMnist
+        case 'cifar10':
+            return DSCifar10
+        case 'rdt-b':
+            return DSRedditB
+        case 'rdt-m5k':
+            return DSRedditM5K
+        case 'rdt-m12k':
+            return DSRedditM12K
+        case 'nci1':
+            return DSNCI1
+        case 'collab':
+            return DSCOLLAB
+        case 'cora':
+            return DSCora
+        case 'citeseer':
+            return DSCiteseer
+        case 'pubmed':
+            return DSPubMed
+        case _:
+            raise ValueError(f'Unknown dataset: {name}')
 
 CSI = "\x1b[" #]
-D = TypeVar("D", bound=Dataset)
 
 def make_dataset(
-    dataset_cls: type[D],
+    dataset_cls: str | type[Dataset],
     cache=True,
     **kwargs
-) -> D:
+) -> Dataset:
+    if isinstance(dataset_cls, str):
+        dataset_cls = get_dataset(dataset_cls)
+    assert(isinstance(dataset_cls, type) and issubclass(dataset_cls, Dataset))
     args = locals()
     del args['cache']
+    if 'verbose' in args['kwargs']:
+        del args['kwargs']['verbose']
     args['dataset_cls'] = dataset_cls.__name__
     hs = hashlib.sha256(
         json.dumps(args, sort_keys=True).encode('utf-8')

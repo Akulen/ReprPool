@@ -1,0 +1,106 @@
+name: MNIST
+dataset: mnist
+lr: 1e-3
+batch_size: 128
+vt_batch_size: 5000
+epochs: 1000
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 110
+  dropout: 0.0
+  n_layers: 4
+  readout: sum
+  batch_norm: true
+  residual: true
+models:
+  - model: GINNet
+    model_params:
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+  - model: GINNet
+    model_params:
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+      readout: repr
+  - model: GINNet
+    model_params:
+      layer_hook: UF
+      hook_args:
+        max_depth: 3
+        num_heads: 2
+        dropout: 0.0
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+  - model: GINNet
+    vt_batch_size: 5000
+    model_params:
+      layer_hook: GN
+      hook_args:
+        num_heads: 2
+        dropout: 0.0
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      edge_feat: true
+      readout: mean
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      edge_feat: true
+      readout: repr
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      edge_feat: true
+      readout: mean
+      use_ln: true
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      layer_hook: UF
+      hook_args:
+        max_depth: 3
+        num_heads: 2
+        dropout: 0.0
+      edge_feat: true
+      readout: mean
+      use_ln: true
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      layer_hook: GN
+      hook_args:
+        num_heads: 2
+        dropout: 0.0
+      edge_feat: true
+      readout: mean
+      use_ln: false
+  - model: GatedGCNNet
+    model_params:
+      d_model: 70
+      layer_hook: GN
+      hook_args:
+        num_heads: 2
+        dropout: 0.0
+      edge_feat: true
+      readout: mean
+      use_ln: true
+optimizer: adam
+scheduler: reducelr
+scheduler_params:
+  factor: 0.5
+  patience: 10
+  min_lr: 1e-5
+seed:
+  - 42
+  # - 4242
+  # - 424242

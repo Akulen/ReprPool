@@ -1,0 +1,37 @@
+name: REDDIT_BINARY_FIX
+dataset: rdt-b
+lr: 1e-3
+batch_size: 1
+vt_batch_size: 20
+epochs: 20
+test_frequency: 1
+loss:
+  - BCE
+  - accuracy
+models:
+  - model: ClusterPooling
+    model_params:
+      d_model: 128
+      n_gnn_layers: 5
+      pooling_freq: 2
+      dropout: 0.0
+      dropout_pool: 0.0
+      head_n_linear: 2
+  - model: UFPooling
+    lr: 1e-3
+    model_params:
+      d_model: 128
+      n_gnn_layers: 5
+      pooling_freq: 2
+      dropout: 0.0
+      dropout_pool: 0.0
+      head_n_linear: 2
+      cluster_activation: sigmoid-off
+optimizer: adamw
+weight_decay: 1e-2
+scheduler: reducelr
+scheduler_params:
+  factor: 0.5
+  patience: 10
+seed:
+  - 42

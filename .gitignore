@@ -3,8 +3,8 @@
 .pixi/*
 !.pixi/config.toml
 mutagen.yml*
-data
+/data
 cache
-experiments/*
-!experiments/config
+/experiments/*
+!/experiments/config
 logs

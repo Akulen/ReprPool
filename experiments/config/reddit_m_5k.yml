@@ -1,7 +1,7 @@
 name: REDDIT_MULTI_5K
 dataset: rdt-m5k
 lr: 7e-4
-batch_size: 4 #4
+batch_size: 4
 vt_batch_size: 20
 epochs: 300
 test_frequency: 1
@@ -11,13 +11,12 @@ loss:
 model_params:
   d_model: 128
   dropout: 0.0
+  n_gnn_layers: 5
+  pooling_freq: 2
+  dropout_pool: 0.0
+  head_n_linear: 2
 models:
   - model: ClusterPooling
-    model_params:
-      n_gnn_layers: 5
-      pooling_freq: 2
-      dropout_pool: 0.0
-      head_n_linear: 2
   # - model: UFPooling
   #   model_params:
   #     cluster_activation: tanh
@@ -26,18 +25,10 @@ models:
   #     cluster_activation: sigmoid
   - model: GNPooling
     model_params:
-      n_gnn_layers: 5
-      pooling_freq: 2
-      dropout_pool: 0.0
-      head_n_linear: 2
       cluster_activation: tanh
       edge_mask: true
   - model: GNPooling
     model_params:
-      n_gnn_layers: 5
-      pooling_freq: 2
-      dropout_pool: 0.0
-      head_n_linear: 2
       cluster_activation: tanh
       edge_mask: false
   # - model: GNNet
@@ -56,6 +47,18 @@ models:
   #     hook_args:
   #       num_heads: 1
   #       dropout: 0.0
+  - model: DiffPool
+    model_params:
+      ks: [400, 300]
+  - model: MinCutPool
+    model_params:
+      ks: [400, 300]
+  - model: SAGPool
+    model_params:
+      ks: [400, 300]
+  - model: TopKPool
+    model_params:
+      ks: [400, 300]
 optimizer: adamw
 weight_decay: 1e-2
 scheduler: periodscale
@@ -66,3 +69,10 @@ seed:
   - 42
   - 4242
   - 424242
+  - 42424242
+  - 4242424242
+  - 424242424242
+  - 42424242424242
+  - 4242424242424242
+  - 424242424242424242
+  - 242424242424242424

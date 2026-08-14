@@ -1,18 +1,32 @@
 from functools import cache
-from typing import Literal
+from typing import List, Literal
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message=r".*pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+)
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    message=r".*`torch_geometric\.distributed` has been deprecated.*",
+)
 from ogb.graphproppred import PygGraphPropPredDataset
 import torch
 from torch_geometric.data.data import DataEdgeAttr, DataTensorAttr
 from torch_geometric.data.storage import GlobalStorage
 import numpy as np
 import jax.numpy as jnp
+from ogb.graphproppred import Evaluator
 
 torch.serialization.add_safe_globals([
     DataEdgeAttr, DataTensorAttr, GlobalStorage
 ])
 
-from ggnn.data.types import BatchedSample, Graph
+from ggnn.data.types import BatchedSample
 from ggnn.data.dataset import Dataset
+from ggnn.data.pyg import pyg_to_jax
 
 @cache
 def ogbg_molhiv():
@@ -22,34 +36,6 @@ def ogbg_molhiv():
         'num_classes': 2,
         'eval_metric': 'rocauc'
     }
-
-def to_jax_padded(xs, pad_len, pad_value=0):
-    return jnp.array([
-        torch.nn.functional.pad(x, (0, pad_len - x.shape[-1]), value=pad_value)
-        for x in xs
-    ])
-
-def pyg_to_jax(pyg_graphs):
-    max_nodes = max(graph.num_nodes for graph in pyg_graphs)
-    max_edges = max(graph.num_edges for graph in pyg_graphs)
-    return Graph(
-        n_nodes=jnp.array([graph.num_nodes for graph in pyg_graphs]),
-        n_edges=jnp.array([graph.num_edges for graph in pyg_graphs]),
-        f_node=to_jax_padded(
-            [graph.x.T for graph in pyg_graphs],
-            max_nodes+1,
-        ).transpose(0, 2, 1),
-        f_edge=to_jax_padded(
-            [graph.edge_attr.T for graph in pyg_graphs],
-            max_edges
-        ).transpose(0, 2, 1),
-        f_graph=jnp.array([graph.y.squeeze() for graph in pyg_graphs]),
-        edges=to_jax_padded(
-            [graph.edge_index for graph in pyg_graphs],
-            max_edges,
-            max_nodes
-        ).transpose(0, 2, 1)
-    )
 
 # from collections import Counter
 # def get_stats(graph: Graph, rng, batch_size=64):
@@ -75,10 +61,11 @@ class DSMolhiv(Dataset):
         connex_target: bool=False,
         **kwargs
     ):
-        super().__init__(**kwargs)
+        dataset, config = ogbg_molhiv()
+        super().__init__(n_class=config['num_classes'], **kwargs)
         self.connex_target = connex_target
 
-        dataset, config = ogbg_molhiv()
+        self.data_type = category
         dataset: PygGraphPropPredDataset = dataset[ #type: ignore
             dataset.get_idx_split()[category]
         ]
@@ -89,6 +76,19 @@ class DSMolhiv(Dataset):
             target=graphs.f_graph
         )
         self.n_samples = len(dataset)
+
+    def self_init(self):
+        super().self_init()
+        self.custom_loss_name = 'rocauc'
+        self.evaluator = Evaluator(name = "ogbg-molhiv")
+
+    def custom_loss(self, y_true, y_pred):
+        input_dict = {
+            "y_true": np.array(y_true[:, None]),
+            "y_pred": np.array(y_pred[:, None]),
+        }
+        result_dict = self.evaluator.eval(input_dict)
+        return result_dict['rocauc']
 
     def to_serializable(self):
         serial = super().to_serializable()
