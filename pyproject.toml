@@ -11,7 +11,7 @@ requires = ["hatchling"]
 
 [tool.pixi.workspace]
 channels = ["conda-forge", "https://conda.anaconda.org/dglteam/label/th21_cu121"]
-platforms = ["linux-64"]
+platforms = [{ platform = "linux-64", cuda = "12" }]
 
 [tool.pixi.pypi-dependencies]
 ggnn = { path = ".", editable = true }
@@ -20,9 +20,6 @@ ggnn = { path = ".", editable = true }
 exp = { cmd = "ipython -m experiments.main --", env = { XLA_PYTHON_CLIENT_ALLOCATOR = "platform" } }
 auto_node = { cmd = "ipython -m experiments.auto_node --", env = { XLA_PYTHON_CLIENT_ALLOCATOR = "platform" } }
 plot = { cmd = "python -m experiments.plot", env = { XLA_PYTHON_CLIENT_ALLOCATOR = "platform" } }
-
-[tool.pixi.system-requirements]
-cuda = "12"
 
 [tool.pixi.dependencies]
 matplotlib = ">=3.10.8,<4"
