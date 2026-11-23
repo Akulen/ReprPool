@@ -1,6 +1,6 @@
 from collections.abc import Hashable, Sequence
 import warnings
-from ogb.utils.features import get_atom_feature_dims, get_bond_feature_dims
+# from ogb.utils.features import get_atom_feature_dims, get_bond_feature_dims
 import jax
 import jax.numpy as jnp
 import jax.lax as lax
@@ -10,48 +10,48 @@ from equinox.nn._misc import named_scope
 from typing import List, Literal, Optional
 from jaxtyping import Array, Bool, Float, Int, Shaped, PRNGKeyArray
 
-class AtomEncoder(eqx.Module):
-    embedders: List[eqx.nn.Embedding]
+# class AtomEncoder(eqx.Module):
+#     embedders: List[eqx.nn.Embedding]
+#
+#     def __init__(
+#         self, key: PRNGKeyArray,
+#         d_model: int
+#     ):
+#         full_atom_feature_dims = get_atom_feature_dims()
+#         keys = jax.random.split(key, len(full_atom_feature_dims))
+#         self.embedders = [
+#             #TODO: Use xavier_uniform to init?
+#             eqx.nn.Embedding(dim, d_model, key=emb_key)
+#             for dim, emb_key in zip(full_atom_feature_dims, keys)
+#         ]
+#
+#     def __call__(self, x: Int[Array, "d_node_in"]) -> Float[Array, "d_model"]:
+#         assert(x.shape[0] == len(self.embedders))
+#         y = jnp.zeros(self.embedders[0].embedding_size)
+#         for i, layer in enumerate(self.embedders):
+#             y += layer(x[i])
+#         return y
 
-    def __init__(
-        self, key: PRNGKeyArray,
-        d_model: int
-    ):
-        full_atom_feature_dims = get_atom_feature_dims()
-        keys = jax.random.split(key, len(full_atom_feature_dims))
-        self.embedders = [
-            #TODO: Use xavier_uniform to init?
-            eqx.nn.Embedding(dim, d_model, key=emb_key)
-            for dim, emb_key in zip(full_atom_feature_dims, keys)
-        ]
-
-    def __call__(self, x: Int[Array, "d_node_in"]) -> Float[Array, "d_model"]:
-        assert(x.shape[0] == len(self.embedders))
-        y = jnp.zeros(self.embedders[0].embedding_size)
-        for i, layer in enumerate(self.embedders):
-            y += layer(x[i])
-        return y
-
-class BondEncoder(eqx.Module):
-    embedders: List[eqx.nn.Embedding]
-
-    def __init__(
-        self, key: PRNGKeyArray,
-        d_model: int
-    ):
-        full_bond_feature_dims = get_bond_feature_dims()
-        keys = jax.random.split(key, len(full_bond_feature_dims))
-        self.embedders = [
-            eqx.nn.Embedding(dim, d_model, key=emb_key)
-            for dim, emb_key in zip(full_bond_feature_dims, keys)
-        ]
-
-    def __call__(self, x: Int[Array, "d_edge_in"]) -> Float[Array, "d_model"]:
-        assert(x.shape[0] == len(self.embedders))
-        y = jnp.zeros(self.embedders[0].embedding_size)
-        for i, layer in enumerate(self.embedders):
-            y += layer(x[i])
-        return y
+# class BondEncoder(eqx.Module):
+#     embedders: List[eqx.nn.Embedding]
+#
+#     def __init__(
+#         self, key: PRNGKeyArray,
+#         d_model: int
+#     ):
+#         full_bond_feature_dims = get_bond_feature_dims()
+#         keys = jax.random.split(key, len(full_bond_feature_dims))
+#         self.embedders = [
+#             eqx.nn.Embedding(dim, d_model, key=emb_key)
+#             for dim, emb_key in zip(full_bond_feature_dims, keys)
+#         ]
+#
+#     def __call__(self, x: Int[Array, "d_edge_in"]) -> Float[Array, "d_model"]:
+#         assert(x.shape[0] == len(self.embedders))
+#         y = jnp.zeros(self.embedders[0].embedding_size)
+#         for i, layer in enumerate(self.embedders):
+#             y += layer(x[i])
+#         return y
 
 def masked_mean(
     x: Float[Array, "n"],
@@ -230,22 +230,19 @@ class BatchNorm(eqx.nn._sequential.StatefulLayer):
             mask = jnp.ones_like(x)
 
         def masked_mean(y, mask, axis_name):
-            mean = (y * mask).sum()
-            mean = lax.psum(mean, axis_name)
-            total = mask.sum()
-            total = lax.psum(total, axis_name)
-            mean = mean / total
-            return mean
+            m = mask.astype(bool)
+            s = lax.psum(jnp.where(m, y, 0.0).sum(), axis_name)
+            n = lax.psum(m.sum(), axis_name)
+            return s / jnp.maximum(n, 1)
 
         def masked_var(y, mask, axis_name, mean=None, ddof=0):
+            m = mask.astype(bool)
             if mean is None:
                 mean = masked_mean(y, mask, axis_name)
-            var = ((y - mean) * jnp.conj(y - mean) * mask).sum()
-            var = lax.psum(var, axis_name)
-            total = mask.sum()
-            total = lax.psum(total, axis_name)
-            var = var / (total - ddof)
-            return var
+            d = jnp.where(m, y - mean, 0.0)
+            s = lax.psum((d * jnp.conj(d)).sum(), axis_name)
+            n = lax.psum(m.sum(), axis_name)
+            return s / jnp.maximum(n - ddof, 1)
 
         def _stats(y, ddof=0):
             mean = masked_mean(y, mask, self.axis_name)

@@ -276,33 +276,33 @@ def parse_plot():
     group_meta.add_argument('--y-min', type=float, nargs='+', default=None)
     group_meta.add_argument('--x-max', type=int, default=None)
     group_meta.add_argument('--exclude-outliers',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--only-test-indicators',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--mark-lines',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--plot-lr',
-        type=bool, default=True, action=argparse.BooleanOptionalAction
+        default=True, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--average-runs',
-        type=bool, default=False, action=argparse.BooleanOptionalAction,
+        default=False, action=argparse.BooleanOptionalAction,
         help='Average over runs with the same config but different seeds'
     )
     group_meta.add_argument('--smooth-window', type=int, default=1)
     group_meta.add_argument('--focus-valid',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--focus-test',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--skip-batch',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
     group_meta.add_argument('--show-param-count',
-        type=bool, default=False, action=argparse.BooleanOptionalAction
+        default=False, action=argparse.BooleanOptionalAction
     )
 
     args = parser.parse_args()

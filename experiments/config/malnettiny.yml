@@ -1,0 +1,73 @@
+name: MALNET_TINY
+dataset: malnettiny
+lr: 1e-3
+batch_size: 16
+vt_batch_size: 20
+epochs: 100 # 150
+test_frequency: 1
+loss:
+  - CrossEntropy
+  - accuracy
+model_params:
+  d_model: 130
+  dropout: 0.0
+  n_layers: 5
+  readout: max
+  batch_norm: true
+  residual: true
+models:
+  - model: GINNet
+    lr: 1e-2
+    model_params:
+      n_layers: 2
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+      layer_hook: GN
+      hook_args:
+        num_heads: 1
+        dropout: 0.0
+  - model: GINNet
+    lr: 3e-3
+    model_params:
+      n_layers: 2
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+      layer_hook: GN
+      hook_args:
+        num_heads: 1
+        dropout: 0.0
+  # - model: GINNet
+  #   model_params:
+  #     n_layers: 3
+  #     n_mlp_layers: 2
+  #     learn_eps: true
+  #     neighbor_aggr_type: sum
+  #     layer_hook: GN
+  #     hook_args:
+  #       num_heads: 1
+  #       dropout: 0.0
+  - model: GINNet
+    model_params:
+      n_mlp_layers: 2
+      learn_eps: true
+      neighbor_aggr_type: sum
+optimizer: adamw
+weight_decay: 1e-5
+scheduler: reducelr
+scheduler_params:
+  factor: 0.5
+  patience: 20
+  min_lr: 1e-5
+seed:
+  - 42
+  - 4242
+  - 424242
+  # - 42424242
+  # - 4242424242
+  # - 424242424242
+  # - 42424242424242
+  # - 4242424242424242
+  # - 424242424242424242
+  # - 242424242424242424

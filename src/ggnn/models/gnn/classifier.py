@@ -5,161 +5,162 @@ from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, Type
 from jaxtyping import Array, Float, PRNGKeyArray
 
 from ggnn.data.types import Graph
-from ggnn.models.utils import AtomEncoder, BondEncoder, BatchNorm
+from ggnn.models.utils import BatchNorm
+# from ggnn.models.utils import AtomEncoder, BondEncoder, BatchNorm
 from ggnn.models.gnn.types import GNNLayer, PoolLayer, ClusteringLayer
 from ggnn.models.gnn.pooling import GlobalAddPool, GlobalMeanPool
 from ggnn.models.gnn.gcn import GCNLayer
 from ggnn.models.gnn.clustering import ClusterPooling, UFPooling, GNPooling
 from ggnn.models.gnn.pool import TopKPool, SAGPool, MinCutPool, DiffPool
 
-class GNNClassifier(eqx.Module):
-    atom_encoder: AtomEncoder
-    # bond_encoder: BondEncoder
-    gnn_layers: List[GNNLayer]
-    bns_node: List[BatchNorm | eqx.nn.LayerNorm]
-    # bns_edge: List[BatchNorm]
-    dropout: eqx.nn.Dropout
-    pool: PoolLayer
-    linear1: eqx.nn.Linear
-    linear2: eqx.nn.Linear
-
-        # key: PRNGKeyArray,
-        # d_model: int=64,
-        # mlp_depth: int=2,
-        # self_edge: bool=True
-    def __init__(
-        self,
-        key: PRNGKeyArray,
-        gnn_layer_gen: Callable[[PRNGKeyArray], GNNLayer], #Literal['GIN', 'UF']='GIN',
-        # n_class: int=2,
-        d_model: int=64,
-        n_gnn_layers: int=2,
-        pooling: Literal['add']='add',
-        dropout: float=0.5,
-        use_ln: bool=False
-    ):
-        key_enc_node, key_gnn, key_pool, key_lin1, key_lin2 = (
-            jax.random.split(key, 5)
-        )
-        self.atom_encoder = AtomEncoder(key_enc_node, d_model)
-        # TODO
-        # self.bond_encoder = BondEncoder(edge_key, d_model)
-        keys = jax.random.split(key_gnn, n_gnn_layers)
-        self.gnn_layers = [
-            gnn_layer_gen(key)
-            for key in keys
-        ]
-        if use_ln:
-            self.bns_node = [
-                eqx.nn.LayerNorm(d_model)
-                for _ in range(n_gnn_layers-1)
-            ]
-        else:
-            self.bns_node = [
-                BatchNorm(
-                    input_size=d_model,
-                    axis_name='batch',
-                    momentum=0.9,
-                    mode='batch'
-                )
-                for _ in range(n_gnn_layers-1)
-            ]
-        # TODO
-        # self.bns_edge = [
-        #     BatchNorm(
-        #         input_size=d_model,
-        #         axis_name=('devices', 'batch'),
-        #         momentum=0.9,
-        #         mode='batch'
-        #     )
-        #     for _ in range(n_gnn_layers-1)
-        # ]
-        self.dropout = eqx.nn.Dropout(dropout)
-        if pooling == 'add':
-            poolingLayer = GlobalAddPool
-        # elif pooling == 'attention':
-        #     poolingLayer = AttentionPooling
-        else:
-            raise NotImplementedError
-        self.pool = poolingLayer(key_pool, d_model)
-        self.linear1 = eqx.nn.Linear(d_model, d_model, key=key_lin1)
-        self.linear2 = eqx.nn.Linear(d_model, 1, key=key_lin2)
-
-    def __call__(
-        self,
-        key: PRNGKeyArray,
-        graph: Graph,
-        state: eqx.nn.State,
-        inference: bool,
-    ) -> Tuple[
-        Float[Array, 'n_class'],
-        eqx.nn.State
-    ]:
-        # Make sure graph only contains a single graph
-        assert len(graph.f_node.shape) == 2
-
-        graph = eqx.tree_at(
-            lambda g: g.f_node,
-            graph,
-            jax.vmap(self.atom_encoder)(graph.f_node)
-        )
-        mask_node = jnp.arange(graph.f_node.shape[0]) < graph.n_nodes
-        # mask_edge = jnp.repeat(
-        #     jnp.array([1, 0]),
-        #     graph.n_edge,
-        #     axis=0,
-        #     total_repeat_length=cast(Array, graph.edges).shape[0]
-        # )
-        for i, layer in enumerate(self.gnn_layers):
-            key, subkey = jax.random.split(key, 2)
-            graph, state = layer(subkey, state, graph, inference)
-            if i < len(self.gnn_layers) - 1:
-                x = graph.f_node
-                bn = self.bns_node[i]
-                if isinstance(bn, eqx.nn.LayerNorm):
-                    x = jax.vmap(bn)(x)
-                else:
-                    x, state = bn(
-                        x.T,
-                        state,
-                        mask=mask_node,
-                        inference=inference
-                    )
-                    x = x.T
-                x = jax.nn.relu(x)
-                key, subkey = jax.random.split(key, 2)
-                x = self.dropout(x, inference=inference, key=subkey)
-        #         g, state = self.bns_edge[i](
-        #             g.T,
-        #             state,
-        #             mask=mask_edge,
-        #             inference=not training
-        #         )
-        #         g = jax.nn.relu(g.T)
-                graph = eqx.tree_at(lambda g: g.f_node, graph, x)
-
-        key, subkey = jax.random.split(key)
-        graph_features = self.pool(
-            subkey,
-            graph,
-            mask=mask_node,
-            inference=inference
-        )
-        key, subkey = jax.random.split(key)
-        graph_features = self.dropout(
-            graph_features,
-            inference=inference,
-            key=subkey
-        )
-        graph_features = jax.nn.relu(
-            self.linear1(graph_features)
-        )
-        graph_features = self.dropout(
-            graph_features,
-            inference=inference,
-            key=key
-        )
-        return self.linear2(graph_features).squeeze(), state
+# class GNNClassifier(eqx.Module):
+#     atom_encoder: AtomEncoder
+#     # bond_encoder: BondEncoder
+#     gnn_layers: List[GNNLayer]
+#     bns_node: List[BatchNorm | eqx.nn.LayerNorm]
+#     # bns_edge: List[BatchNorm]
+#     dropout: eqx.nn.Dropout
+#     pool: PoolLayer
+#     linear1: eqx.nn.Linear
+#     linear2: eqx.nn.Linear
+#
+#         # key: PRNGKeyArray,
+#         # d_model: int=64,
+#         # mlp_depth: int=2,
+#         # self_edge: bool=True
+#     def __init__(
+#         self,
+#         key: PRNGKeyArray,
+#         gnn_layer_gen: Callable[[PRNGKeyArray], GNNLayer], #Literal['GIN', 'UF']='GIN',
+#         # n_class: int=2,
+#         d_model: int=64,
+#         n_gnn_layers: int=2,
+#         pooling: Literal['add']='add',
+#         dropout: float=0.5,
+#         use_ln: bool=False
+#     ):
+#         key_enc_node, key_gnn, key_pool, key_lin1, key_lin2 = (
+#             jax.random.split(key, 5)
+#         )
+#         self.atom_encoder = AtomEncoder(key_enc_node, d_model)
+#         # TODO
+#         # self.bond_encoder = BondEncoder(edge_key, d_model)
+#         keys = jax.random.split(key_gnn, n_gnn_layers)
+#         self.gnn_layers = [
+#             gnn_layer_gen(key)
+#             for key in keys
+#         ]
+#         if use_ln:
+#             self.bns_node = [
+#                 eqx.nn.LayerNorm(d_model)
+#                 for _ in range(n_gnn_layers-1)
+#             ]
+#         else:
+#             self.bns_node = [
+#                 BatchNorm(
+#                     input_size=d_model,
+#                     axis_name='batch',
+#                     momentum=0.9,
+#                     mode='batch'
+#                 )
+#                 for _ in range(n_gnn_layers-1)
+#             ]
+#         # TODO
+#         # self.bns_edge = [
+#         #     BatchNorm(
+#         #         input_size=d_model,
+#         #         axis_name=('devices', 'batch'),
+#         #         momentum=0.9,
+#         #         mode='batch'
+#         #     )
+#         #     for _ in range(n_gnn_layers-1)
+#         # ]
+#         self.dropout = eqx.nn.Dropout(dropout)
+#         if pooling == 'add':
+#             poolingLayer = GlobalAddPool
+#         # elif pooling == 'attention':
+#         #     poolingLayer = AttentionPooling
+#         else:
+#             raise NotImplementedError
+#         self.pool = poolingLayer(key_pool, d_model)
+#         self.linear1 = eqx.nn.Linear(d_model, d_model, key=key_lin1)
+#         self.linear2 = eqx.nn.Linear(d_model, 1, key=key_lin2)
+#
+#     def __call__(
+#         self,
+#         key: PRNGKeyArray,
+#         graph: Graph,
+#         state: eqx.nn.State,
+#         inference: bool,
+#     ) -> Tuple[
+#         Float[Array, 'n_class'],
+#         eqx.nn.State
+#     ]:
+#         # Make sure graph only contains a single graph
+#         assert len(graph.f_node.shape) == 2
+#
+#         graph = eqx.tree_at(
+#             lambda g: g.f_node,
+#             graph,
+#             jax.vmap(self.atom_encoder)(graph.f_node)
+#         )
+#         mask_node = jnp.arange(graph.f_node.shape[0]) < graph.n_nodes
+#         # mask_edge = jnp.repeat(
+#         #     jnp.array([1, 0]),
+#         #     graph.n_edge,
+#         #     axis=0,
+#         #     total_repeat_length=cast(Array, graph.edges).shape[0]
+#         # )
+#         for i, layer in enumerate(self.gnn_layers):
+#             key, subkey = jax.random.split(key, 2)
+#             graph, state = layer(subkey, state, graph, inference)
+#             if i < len(self.gnn_layers) - 1:
+#                 x = graph.f_node
+#                 bn = self.bns_node[i]
+#                 if isinstance(bn, eqx.nn.LayerNorm):
+#                     x = jax.vmap(bn)(x)
+#                 else:
+#                     x, state = bn(
+#                         x.T,
+#                         state,
+#                         mask=mask_node,
+#                         inference=inference
+#                     )
+#                     x = x.T
+#                 x = jax.nn.relu(x)
+#                 key, subkey = jax.random.split(key, 2)
+#                 x = self.dropout(x, inference=inference, key=subkey)
+#         #         g, state = self.bns_edge[i](
+#         #             g.T,
+#         #             state,
+#         #             mask=mask_edge,
+#         #             inference=not training
+#         #         )
+#         #         g = jax.nn.relu(g.T)
+#                 graph = eqx.tree_at(lambda g: g.f_node, graph, x)
+#
+#         key, subkey = jax.random.split(key)
+#         graph_features = self.pool(
+#             subkey,
+#             graph,
+#             mask=mask_node,
+#             inference=inference
+#         )
+#         key, subkey = jax.random.split(key)
+#         graph_features = self.dropout(
+#             graph_features,
+#             inference=inference,
+#             key=subkey
+#         )
+#         graph_features = jax.nn.relu(
+#             self.linear1(graph_features)
+#         )
+#         graph_features = self.dropout(
+#             graph_features,
+#             inference=inference,
+#             key=key
+#         )
+#         return self.linear2(graph_features).squeeze(), state
 
 class PoolingClassifier(eqx.Module):
     gnn_layers: List[GNNLayer]

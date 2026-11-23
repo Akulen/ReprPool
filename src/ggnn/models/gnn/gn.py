@@ -10,7 +10,7 @@ from ggnn.models.graph_utils import und_to_dir
 from ggnn.models.gnn.types import GNNLayer, PoolLayer
 from ggnn.models.gnn.gin import GINLayer
 from ggnn.models.gnn.gcn import GCNLayer, GatedGCNLayer
-from ggnn.models.gnn.pooling import GlobalAddPool, GlobalMeanPool, GlobalReprPool
+from ggnn.models.gnn.pooling import GlobalAddPool, GlobalMaxPool, GlobalMeanPool, GlobalReprPool
 from ggnn.models.gnn.mlp import MLP
 from ggnn.models.gnn.uf import GNHook
 from ggnn.models.gnn.unet import EdgeDrop
@@ -112,114 +112,6 @@ class GNLayer(GNNLayer):
 
         return eqx.tree_at(lambda g: g.f_node, graph, x), state
 
-class GNGINNet(eqx.Module):
-    n_classes: int=eqx.field(static=True)
-    embedding_h: eqx.nn.Linear
-    gin_layers: List[GINLayer]
-    linears_prediction: List[eqx.nn.Linear]
-    pool: PoolLayer
-
-    def __init__(
-        self,
-        key: PRNGKeyArray,
-        d_in: int,
-        d_in_edge: int,
-        n_classes: int,
-
-        d_model: int=64,
-        dropout: float=0.0,
-        n_layers: int=2,
-        # layer_hook: str="DefaultHook",
-        hook_args: dict={},
-
-        n_mlp_layers: int=2,
-        learn_eps: bool=True,
-        neighbor_aggr_type: str='sum',
-        readout: str='sum',
-        batch_norm: bool=True,
-        residual: bool=True
-    ):
-        del d_in_edge
-        self.n_classes = n_classes
-        key_emb, key_gin, key_lin = jax.random.split(key, 3)
-        self.embedding_h = eqx.nn.Linear(
-            in_features=d_in,
-            out_features=d_model,
-            key=key_emb
-        )
-        keys_gin = jax.random.split(key_gin, n_layers)
-        self.gin_layers = [
-            GINLayer(
-                key=subkey,
-                d_model=d_model,
-                layer_hook='DefaultHook' if i == 0 else 'GN',
-                hook_args={} if i == 0 else hook_args,
-                mlp_depth=n_mlp_layers,
-                aggr_type=neighbor_aggr_type,
-                dropout=dropout,
-                batch_norm=batch_norm,
-                residual=residual,
-                learn_eps=learn_eps
-            )
-            for i, subkey in enumerate(keys_gin)
-        ]
-
-        keys_lin = jax.random.split(key_lin, n_layers + 1)
-        self.linears_prediction = [
-            eqx.nn.Linear(
-                in_features=d_model,
-                out_features=n_classes,
-                key=subkey
-            )
-            for subkey in keys_lin
-        ]
-
-        match readout:
-            case 'sum':
-                self.pool = GlobalAddPool(key)
-            case 'repr':
-                self.pool = GlobalReprPool(key, d_model)
-            case _:
-                raise ValueError(f'Pool type {readout} not supported')
-
-    def __call__(
-        self,
-        key: PRNGKeyArray,
-        graph: Graph,
-        state: eqx.nn.State,
-        inference: bool=False
-    ) -> Tuple[
-        Float[Array, 'n_class'],
-        eqx.nn.State
-    ]:
-        graph = eqx.tree_at(
-            lambda g: g.f_node,
-            graph,
-            jax.vmap(self.embedding_h)(graph.f_node)
-        )
-
-        hidden_rep = [graph.f_node]
-
-        for layer in self.gin_layers:
-            key, subkey = jax.random.split(key)
-            graph, state = layer(subkey, state, graph, inference)
-            hidden_rep.append(graph.f_node)
-
-        score_over_layer = jnp.zeros(self.n_classes)
-
-        mask = jnp.arange(graph.f_node.shape[0]) < graph.n_nodes
-        for i, h in enumerate(hidden_rep):
-            key, subkey = jax.random.split(key)
-            pooled_h = self.pool(
-                subkey,
-                eqx.tree_at(lambda g: g.f_node, graph, h),
-                mask,
-                inference
-            )
-            score_over_layer += self.linears_prediction[i](pooled_h)
-
-        return score_over_layer, state
-
 class GNNet(eqx.Module):
     n_classes: int=eqx.field(static=True)
     embedding_h: eqx.nn.Linear
@@ -308,7 +200,7 @@ class GNNet(eqx.Module):
         )
 
     def __call__(
-        self, 
+        self,
         key: PRNGKeyArray,
         graph: Graph,
         state: eqx.nn.State,
@@ -421,7 +313,7 @@ class GNNet2(eqx.Module):
         )
 
     def __call__(
-        self, 
+        self,
         key: PRNGKeyArray,
         graph: Graph,
         state: eqx.nn.State,

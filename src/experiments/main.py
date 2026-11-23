@@ -10,16 +10,19 @@ if __name__ == '__main__':
     os.environ['XLA_PYTHON_CLIENT_ALLOCATOR'] = 'platform'
     set_gpus(exp_args.n_gpus, forcing=False, max_tasks=1)
 
-import time
 import argparse
-import pickle
-import jax
-import numpy as np
-import jax.numpy as jnp
 import equinox as eqx
+import jax
+import jax.numpy as jnp
+import logging
+import numpy as np
+import pickle
+import time
 from typing import cast
 from jaxtyping import Array, Float
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 from experiments.utils import (
     complete_model_args, load_run, save_run, make_scheduler, make_optimizer
@@ -31,6 +34,7 @@ from ggnn.training import Trainer
 from ggnn.models import get_model
 
 jax.config.update("jax_debug_nans", True)
+# jax.config.update("jax_disable_jit", True)
 
 CSI = "\x1b[" #]
 
@@ -43,6 +47,7 @@ def run(
     n_gpus: int=-1,
     force: bool=False
 ):
+    logger.info('Started run')
     key, subkey = jax.random.split(jax.random.PRNGKey(args.seed))
     dataset_model_params = data_train.model_params()
     model, state = eqx.nn.make_with_state(
@@ -93,12 +98,12 @@ def run(
     data_valid.set_step_function(static, trainer.eval_step)
     data_test.set_step_function(static, trainer.eval_step)
 
-    data_train.precompile(params, state, opt_state, key, args.batch_size)
+    data_train.precompile(params, state, opt_state, key, args.batch_size, verbose)
     vt_batch_size = args.vt_batch_size
     if vt_batch_size == 0:
         vt_batch_size = args.batch_size
-    data_valid.precompile(params, state, opt_state, key, vt_batch_size)
-    data_test.precompile(params, state, opt_state, key, vt_batch_size)
+    data_valid.precompile(params, state, opt_state, key, vt_batch_size, verbose)
+    data_test.precompile(params, state, opt_state, key, vt_batch_size, verbose)
 
     best_state = (params, state, opt_state)
     best_val_loss = jnp.inf
@@ -249,6 +254,12 @@ def graph_exp(
 
 
 if exp_args is not None:
+    logging.basicConfig(
+        filename='exp.log',
+        level=logging.INFO if exp_args.verbose > 0 else logging.ERROR,
+        format="%(relativeCreated)6d ms:[%(name)s]:%(levelname)s - %(message)s"
+    )
+    logger.info('Started Logger')
     data_train = make_dataset(
         exp_args.dataset,
         cache=not exp_args.debug,
@@ -256,6 +267,7 @@ if exp_args is not None:
         shuffle=True,
         verbose=exp_args.verbose>1
     )
+    logger.info('Loaded first dataset')
     if data_train.task == 'node':
         from experiments.main_node import node_exp
         from ggnn.data.node import NodeDataset
@@ -270,6 +282,7 @@ if exp_args is not None:
             shuffle=False,
             verbose=exp_args.verbose>1
         )
+        logger.info('Loaded valid dataset')
         data_test = make_dataset(
             exp_args.dataset,
             cache=not exp_args.debug,
@@ -277,6 +290,7 @@ if exp_args is not None:
             shuffle=False,
             verbose=exp_args.verbose>1
         )
+        logger.info('Loaded train dataset')
 
         mods = {}
         if 'modularity' in exp_args.loss:
@@ -298,4 +312,4 @@ if exp_args is not None:
 
     os.makedirs(f'experiments/results/{exp_args.name}', exist_ok=True)
     with open(f'experiments/results/{exp_args.name}/results.pkl', 'wb') as f:
-        pickle.dump((exp_args, results), f)
+        pickle.dump((exp_args, results), f, protocol=pickle.HIGHEST_PROTOCOL)

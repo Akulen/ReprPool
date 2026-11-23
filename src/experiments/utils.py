@@ -105,7 +105,7 @@ def make_scheduler(args: argparse.Namespace, model: eqx.Module, data: Dataset):
         )
     else:
         raise ValueError(f'Unknown scheduler {args.scheduler}')
-    
+
     return transform, transform_state, scheduler
 
 def make_optimizer(args: argparse.Namespace, model: eqx.Module, scheduler):

@@ -8,6 +8,28 @@ from ggnn.data.types import Graph
 from ggnn.models.gnn.types import PoolLayer
 from ggnn.models.gnn.uf import GNCluster
 
+class GlobalMaxPool(PoolLayer):
+    def __init__(
+        self,
+        key: PRNGKeyArray,
+        d_model: int=64
+    ):
+        del key, d_model
+
+    def __call__(
+        self,
+        key: PRNGKeyArray,
+        graph: Graph,
+        mask: Optional[Bool[Array, "n"]]=None,
+        inference: bool=False
+    ) -> Float[Array, "d_model"]:
+        # Make sure graph only contains a single graph
+        assert len(graph.f_node.shape) == 2
+
+        if mask is None:
+            mask = jnp.ones_like(graph.f_node)
+        return (graph.f_node * mask[:, None]).max(axis=0)
+
 class GlobalAddPool(PoolLayer):
     def __init__(
         self,

@@ -1,18 +1,19 @@
 import jax
 import jax.numpy as jnp
 import equinox as eqx
-from typing import TYPE_CHECKING, Any, List, Literal, Optional, Tuple
-from jaxtyping import Array, Bool, Float, Int, Shaped, PRNGKeyArray
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
+from jaxtyping import Array, Float, Int, Shaped, PRNGKeyArray
 
 if TYPE_CHECKING:
     from ggnn.models.gnn.types import GNNLayer
 from ggnn.models.gnn.hooks import DefaultHook
 from ggnn.data.types import Graph
 # from ggnn.models.gnn.types import PoolLayer
-from ggnn.models.utils import layer_norm, BatchNorm, masked_mean
+# from ggnn.models.utils import layer_norm, BatchNorm, masked_mean
 # from ggnn.models.gnn.classifier import GNNClassifier
 # from ggnn.models.gnn.gin import GINLayer
 # from ggnn.models.gnn.pooling import GlobalAddPool
+from utils.jaxtools import cond_print, count_distinct
 
 def segment_argmax(
     x: Shaped[Array, "n"],
@@ -59,6 +60,21 @@ def count_clusters(
     )
 
     return jnp.sum(cluster_sizes > 0)
+
+def fully_clustered(graph, debug=0):
+    edges = graph.edges
+    mask = jnp.arange(edges.shape[0]) < graph.n_edges
+    jax.lax.cond(
+        debug > 0,
+        lambda x, y: jax.debug.print('Depth {} => {}', x-1, y),
+        lambda x, y: None,
+        debug,
+        (mask, edges[:, 0] == edges[:, 1])
+    )
+    # Check if all edges are self-edges (fully compressed)
+    return jnp.logical_or(
+        ~mask, edges[:, 0] == edges[:, 1]
+    ).all()
 
 # Greatest Neighbor Clustering
 class GNCluster(eqx.Module):
@@ -210,11 +226,16 @@ class GNCluster(eqx.Module):
 
         repr = self.find_clusters(edge_up)
         repr = jnp.where(mask_node, repr, n-1)
-        n_clusters = count_clusters(repr)
 
-        cluster_repr, repr_cluster = jnp.unique(
-            repr, return_inverse=True, size=n, fill_value=n-1
-        )
+        is_leader = repr == jnp.arange(n)
+        repr_cluster = (jnp.cumsum(is_leader) - 1)[repr]
+        cluster_repr = jnp.nonzero(is_leader, size=n, fill_value=n-1)[0]
+        n_clusters = jnp.sum(is_leader & mask_node)
+
+        # n_clusters = count_clusters(repr)
+        # cluster_repr, repr_cluster = jnp.unique(
+        #     repr, return_inverse=True, size=n, fill_value=n-1
+        # )
 
         # TODO try different score regularizations, like softmax
         # Maybe should be + 1 / degree instead of + 0.5?
@@ -374,7 +395,7 @@ class UFCluster(eqx.Module):
         # 1. Neighborhood aggregation (weighted mean)
         neighbor_nodes_idx = graph.edges[:, 0]
         neighbor_target_idx = graph.edges[:, 1]
-        
+
         weighted_neighbor_features = jax.ops.segment_sum(
             scores[neighbor_nodes_idx, None] * graph.f_node[neighbor_nodes_idx],
             neighbor_target_idx,
@@ -385,19 +406,19 @@ class UFCluster(eqx.Module):
             neighbor_target_idx,
             num_segments=n
         )
-        
+
         total_abs_score = jnp.abs(scores) + neighbor_score_abs_sum
         messages = (scores[:, None] * graph.f_node + weighted_neighbor_features) / (total_abs_score[:, None] + 1e-8)
-        
+
         # 2. Cluster aggregation (weighted sum)
-        # Note: Summing into clusters allows the signal magnitude to reflect 
+        # Note: Summing into clusters allows the signal magnitude to reflect
         # cluster size, similar to ClusterPooling and GlobalAddPool.
         f_cluster = jax.ops.segment_sum(
             scores[:, None] * messages,
             repr_cluster,
             num_segments=n
         )
-        
+
         return Graph(
             n_nodes=n_clusters,
             n_edges=graph.n_edges,
@@ -653,9 +674,9 @@ class UFHook(DefaultHook):
 #     reduce_cluster: List[eqx.nn.Linear]
 #     bns: List[BatchNorm]
 #     dropout: eqx.nn.Dropout
-# 
+#
 #     gnns: List[GNNLayer]
-# 
+#
 #     def __init__(
 #         self,
 #         key: PRNGKeyArray,
@@ -745,7 +766,7 @@ class UFHook(DefaultHook):
 #             for _ in range(max_depth)
 #         ]
 #         self.dropout = eqx.nn.Dropout(dropout_p)
-# 
+#
 #         keys = jax.random.split(key_mlp, max_depth)
 #         self.gnns = [
 #             GINLayer(
@@ -762,7 +783,7 @@ class UFHook(DefaultHook):
 #             )
 #             for subkey in keys
 #         ]
-# 
+#
 #     def __call__(
 #         self,
 #         key: PRNGKeyArray,
@@ -783,7 +804,7 @@ class UFHook(DefaultHook):
 #             graphs.append(graph)
 #             clusters.append(cluster)
 #             scores.append(score)
-# 
+#
 #         # TODO: detect when stable (all edges are self_edges), and zero out
 #         # after
 #         # for layer in self.layers:
@@ -792,7 +813,7 @@ class UFHook(DefaultHook):
 #             # key, key_layer, key_dropout = jax.random.split(key, 3)
 #             # x = layer(key_layer, x, *args, inference=inference, **kwargs)
 #             # x = x_0 + self.dropout(x, inference=inference, key=key_dropout)
-# 
+#
 #         # Attention between connected components
 #         f_cc = graphs[-1].f_node
 #         mask = jnp.arange(n) < graphs[-1].n_nodes
@@ -823,7 +844,7 @@ class UFHook(DefaultHook):
 #             graphs[-1],
 #             f_cc
 #         )
-# 
+#
 #         # Expand down
 #         for i in range(len(graphs)-2, -1, -1):
 #             x = graphs[i].f_node
@@ -852,7 +873,7 @@ class UFHook(DefaultHook):
 #                 ),
 #                 inference
 #             )
-# 
+#
 #         return graphs[0], state
 
 # class UFClassifier(GNNClassifier):
@@ -1092,9 +1113,9 @@ class GNHook(DefaultHook):
         mask = jnp.arange(x.shape[0]) < graph.n_nodes
         x_norm = jax.vmap(self.cc_norm)(x)
         key_att, key_do = jax.random.split(key)
-        
+
         att_mask = jnp.outer(mask, mask)
-        
+
         x_att = self.cc_op(
             query=x_norm,
             key_=x_norm,
@@ -1104,11 +1125,62 @@ class GNHook(DefaultHook):
             key=key_att
         )
         x_att = self.dropout(x_att, inference=inference, key=key_do)
-        
+
         # Residual connection
         x = x + x_att
 
         return eqx.tree_at(lambda g: g.f_node, graph, x)
+
+    def up_step_fn(
+        self,
+        carry: Tuple[Graph, eqx.nn.State, PRNGKeyArray],
+        depth: int | Int[Array, ""],
+        inference: bool=False,
+        reduction_factor: float=100,
+    ) -> Tuple[
+        Tuple[Graph, eqx.nn.State, PRNGKeyArray],
+        Tuple[Graph, Int[Array, "n"]]
+    ]:
+        cur_graph, state, key = carry
+
+        def clustering_fn(args):
+            clustered_graph, clustering, _, state = self.clustering(
+                args[0],
+                args[1],
+                args[2],
+                inference,
+                args[-1],
+            )
+            # clustered_graph = eqx.tree_at(
+            #     lambda g: g.f_node,
+            #     clustered_graph,
+            #     jax.vmap(self.up_norm)(clustered_graph.f_node)
+            # )
+            return clustered_graph, clustering, state
+
+        key, subkey = jax.random.split(key)
+
+        def noop(c):
+            return (
+                c[2],
+                -jnp.ones(cur_graph.f_node.shape[0], dtype=jnp.int32),
+                c[1]
+            )
+
+        clustered_graph, clustering, state = jax.lax.cond(
+            fully_clustered(cur_graph),
+            noop,
+            clustering_fn,
+            (
+                subkey, state, cur_graph,
+                -2 #(1 / reduction_factor) ** depth - 1
+            )
+        )
+
+        return (
+            (clustered_graph, state, key),
+            (clustered_graph, clustering)
+        )
 
     def stack_cluster(
         self,
@@ -1116,63 +1188,38 @@ class GNHook(DefaultHook):
         state: eqx.nn.State,
         graph: Graph,
         inference: bool=False,
-        max_depth: int=5,
-        reduction_factor: float=10
+        max_depth: int=20,
+        reduction_factor: float=100
     ) -> Tuple[Graph, eqx.nn.State]:
-        # max_depth = 5 # 10 # 20
-        # reduction_factor = 10 # 2
-
-        def fully_clustered(graph):
-            edges = graph.edges
-            mask = jnp.arange(edges.shape[0]) < graph.n_edges
-            # Check if all edges are self-edges (fully compressed)
-            return jnp.logical_or(
-                ~mask, edges[:, 0] == edges[:, 1]
-            ).all()
-
-        def up_step_fn(carry, depth):
-            cur_graph, state, key = carry
-
-            def clustering_fn(carry):
-                clustered_graph, clustering, _, state = self.clustering(
-                    carry[0],
-                    carry[1],
-                    carry[2],
-                    inference,
-                    carry[-1],
-                )
-                # clustered_graph = eqx.tree_at(
-                #     lambda g: g.f_node,
-                #     clustered_graph,
-                #     jax.vmap(self.up_norm)(clustered_graph.f_node)
-                # )
-                return clustered_graph, clustering, state
-
-            key, subkey = jax.random.split(key)
-            clustered_graph, clustering, state = jax.lax.cond(
-                fully_clustered(cur_graph),
-                lambda c: (
-                    c[2],
-                    -jnp.ones(cur_graph.f_node.shape[0], dtype=jnp.int32),
-                    c[1]
-                ),
-                clustering_fn,
-                (
-                    subkey, state, cur_graph,
-                    (1 / reduction_factor) ** depth - 1
-                )
-            )
-
-            return (
-                (clustered_graph, state, key),
-                (clustered_graph, clustering)
-            )
-            
         (_, state, key), (clustered_graphs, clusterings) = jax.lax.scan(
-            up_step_fn,
+            lambda carry, depth: self.up_step_fn(
+                carry, depth, inference=inference, reduction_factor=reduction_factor
+            ),
             (graph, state, key),
             jnp.arange(max_depth)
         )
+        def residual_stats(g):
+            e, n = g.edges, g.f_node.shape[0]
+            live = (jnp.arange(e.shape[0]) < g.n_edges) & (e[:, 0] != e[:, 1])
+            e = jnp.where(live[:, None], e, -1)
+            u = jnp.unique(e, axis=0, size=e.shape[0], fill_value=-1)
+            ok = u[:, 0] >= 0
+            deg = (
+                jax.ops.segment_sum(ok.astype(jnp.int32), jnp.where(ok, u[:, 0], n), n + 1)
+                + jax.ops.segment_sum(ok.astype(jnp.int32), jnp.where(ok, u[:, 1], n), n + 1)
+            )[:n]
+            return ok.sum(), deg.max()
+        # cond_print(
+        #     ~fully_clustered(jax.tree.map(lambda x: x[-1], clustered_graphs)),
+        #     "[{}], Warning! Couldn't fully cluster graph ({}, {}) in {} poolings\n"
+        #     "{}",
+        #     fully_clustered(jax.tree.map(lambda x: x[-1], clustered_graphs)),
+        #     graph.n_nodes, graph.n_edges, max_depth,
+        #     (clustered_graphs.n_nodes, jax.vmap(count_distinct)(clustered_graphs.edges), residual_stats(jax.tree.map(lambda x: x[-1], clustered_graphs)))
+        # )
+        # jax.debug.print('steps: {}',
+        #     (clustered_graphs.n_nodes, jax.vmap(count_distinct)(clustered_graphs.edges))
+        # )
         graphs = jax.tree.map(
             lambda x, xs: jnp.concatenate([x[None], xs], axis=0),
             graph,
@@ -1197,7 +1244,7 @@ class GNHook(DefaultHook):
         # Apply CC Step to the graph reached at the end of clustering
         graph_top = self.cc_step(
             subkey,
-            jax.tree.map(lambda x: x[top_depth], graphs),
+            graphs[top_depth],
             inference
         )
         # Update the 'graphs' stack at the final depth
@@ -1211,14 +1258,14 @@ class GNHook(DefaultHook):
             nonlocal graphs
             depth, clustering = val
             cluster_graph, state, key = carry
-            node_graph = jax.tree.map(lambda x: x[depth], graphs)
-            
+            node_graph = graphs[depth]
+
             def body_fn(carry):
                 node_graph, cluster_graph, state, key = carry
-                
+
                 x_c = cluster_graph.f_node[clustering]
                 x_n = node_graph.f_node
-                
+
                 weight = jax.vmap(self.reduce_weight)(
                     jnp.concatenate([x_n, x_c], axis=1)
                 )
@@ -1227,10 +1274,10 @@ class GNHook(DefaultHook):
                 key, subkey = jax.random.split(key)
                 upd = self.dropout(upd, inference=inference, key=subkey)
                 # upd = jax.vmap(self.down_norm)(x_c)
-                
+
                 x = (1 - weight[:, None]) * x_n + upd
                 # x = jax.vmap(self.down_norm)(x)
-                
+
                 return x, state, key
 
             should_run = depth < top_depth
@@ -1241,7 +1288,7 @@ class GNHook(DefaultHook):
                 (node_graph, cluster_graph, state, key)
             )
             node_graph = eqx.tree_at(lambda g: g.f_node, node_graph, x)
-            
+
             return (
                 (node_graph, state, key),
                 None
@@ -1250,7 +1297,7 @@ class GNHook(DefaultHook):
         # Scan for max_depth steps
         (graph, state, _), _ = jax.lax.scan(
             down_step_fn,
-            (jax.tree.map(lambda x: x[-1], graphs), state, key),
+            (graphs[-1], state, key),
             (jnp.arange(max_depth, 0, -1) - 1, clusterings[::-1])
         )
         return graph, state

@@ -1,10 +1,13 @@
-from functools import partial
+import equinox as eqx
 import jax
 import jax.numpy as jnp
+import logging
 import optax
-import equinox as eqx
 from typing import cast, Any, Callable, List, Literal, Optional, Protocol, Tuple
 from jaxtyping import Array, Bool, Float, Int, PRNGKeyArray, Real
+from jax.sharding import AxisType
+
+logger = logging.getLogger(__name__)
 
 from ggnn.data.types import BatchedData, BatchedSample, Graph
 from ggnn.models.gnn.metrics import modularity, modularity_loss
@@ -97,6 +100,7 @@ def make_masks(
 ) -> Tuple[Bool[Array, "n"], Bool[Array, "m"]]:
     assert isinstance(batch.data, Graph)
     node_mask = jnp.arange(batch.data.f_node.shape[0]) < batch.data.n_nodes
+    assert batch.data.f_edge is not None
     edge_mask = jnp.arange(batch.data.f_edge.shape[0]) < batch.data.n_edges
     if batch.mask is not None:
         node_mask = node_mask & batch.mask
@@ -113,7 +117,9 @@ class Trainer:
         if n_devices is None:
             n_devices = jax.device_count()
         self.n_devices = n_devices
-        self.mesh = jax.make_mesh((n_devices,), ("batch",))
+        self.mesh = jax.make_mesh(
+            (n_devices,), ("batch",), axis_types=(AxisType.Auto,)
+        )
         self.global_sharding = jax.sharding.NamedSharding(
             self.mesh, jax.sharding.PartitionSpec()
         )
@@ -140,7 +146,7 @@ class Trainer:
                     raise NotImplementedError(f'Loss {l} not implemented')
             self.loss.append(l)
         self.clustering_metric = clustering_metric
-        # print(f"Trainer initialized with clustering_metric={self.clustering_metric}")
+        # logger.info(f"Trainer initialized with clustering_metric={self.clustering_metric}")
 
     def global_shard(self, *data):
         if len(data) == 1:
@@ -174,7 +180,8 @@ class Trainer:
             cast(Callable, model),
             in_axes=(0,) +(None,) * len(data) + (0,) + (None, None),
             out_axes=out_axes,
-            axis_name='batch'
+            axis_name='batch',
+            spmd_axis_name='batch'
         )(keys, *data, batch.data, state, inference)
         node_mask = None
         edge_mask = None
@@ -184,6 +191,7 @@ class Trainer:
             node_mask, edge_mask = jax.vmap(make_masks)(batch)
         else:
             outputs, state = res
+        logger.info(f'Outputs {outputs}')
         # outputs, state = jax.vmap(
         #     partial(cast(Callable, model), state, inference, *data),
         #     axis_name='batch'

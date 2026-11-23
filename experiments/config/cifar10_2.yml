@@ -27,12 +27,13 @@ models:
       n_mlp_layers: 2
       learn_eps: true
       neighbor_aggr_type: sum
-  - model: GNGINNet
+  - model: GINNet
     model_params:
       n_layers: 2
       n_mlp_layers: 2
       learn_eps: true
       neighbor_aggr_type: sum
+      layer_hook: GN
       hook_args:
         num_heads: 1
         dropout: 0.0

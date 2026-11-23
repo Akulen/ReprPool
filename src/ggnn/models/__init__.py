@@ -19,13 +19,12 @@ def get_model(model_name: str, task: str='graph'):
         case 'GINNet':
             return GINNet
         case 'GIN':
-            return GINClassifier
+            raise NotImplementedError
+            # return GINClassifier
         case 'GatedGCNNet':
             return GatedGCNNet
         case 'UFNet':
             return UFNet
-        case 'GNGINNet':
-            return GNGINNet
         case 'GNNet':
             return GNNet
         case 'GNNet2':

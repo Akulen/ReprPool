@@ -1,15 +1,9 @@
-import os
-from functools import cache
 from typing import Literal
 
-from benchmarking.data.superpixels import SuperPixDataset
 from ggnn.data.dataset import Dataset
 from ggnn.data.types import BatchedSample
-from ggnn.data.mnist import dgl_to_jax
-
-@cache
-def loadPixDataset(name='CIFAR10'):
-    return SuperPixDataset(name)
+from ggnn.data.pyg import pyg_to_jax
+from ggnn.data.mnist import loadPixDataset
 
 class DSCifar10(Dataset):
     def __init__(
@@ -17,23 +11,13 @@ class DSCifar10(Dataset):
         category: Literal['train', 'valid', 'test']='train',
         **kwargs
     ):
-        os.chdir('../benchmarking-gnns')
-        dataset = loadPixDataset()
-        os.chdir('../GGNN')
+        dataset = loadPixDataset('CIFAR10', category)
 
         self.data_type = category
-        match category:
-            case 'train':
-                dataset = dataset.train
-            case 'valid':
-                dataset = dataset.val
-            case 'test':
-                dataset = dataset.test
-
         super().__init__(n_class=10, **kwargs)
 
         self.global_data = ()
-        graph = dgl_to_jax(dataset)
+        graph = pyg_to_jax(dataset)
         self.samples = BatchedSample(
             data=graph,
             target=graph.f_graph

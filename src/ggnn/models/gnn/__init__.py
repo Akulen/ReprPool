@@ -1,4 +1,5 @@
-from ggnn.models.gnn.gin import GINClassifier, GINNet
+from ggnn.models.gnn.gin import GINNet
+# from ggnn.models.gnn.gin import GINClassifier, GINNet
 from ggnn.models.gnn.gcn import GatedGCNNet
 from ggnn.models.gnn.uf import UFNet
 from ggnn.models.gnn.classifier import (
@@ -7,11 +8,11 @@ from ggnn.models.gnn.classifier import (
     DiffPoolClassifier
 )
 from ggnn.models.gnn.graph_clustering import GNClustering
-from ggnn.models.gnn.gn import GNNet, GNNet2, GNGINNet, ReGNodeClassifier
+from ggnn.models.gnn.gn import GNNet, GNNet2, ReGNodeClassifier
 from ggnn.models.gnn.unet import GraphUNetNodeClassifier
 
 __all__ = [
-    'GINClassifier',
+    # 'GINClassifier',
     'GINNet',
     'GatedGCNNet',
     'UFNet',
@@ -21,7 +22,6 @@ __all__ = [
     'GNClustering',
     'GNNet',
     'GNNet2',
-    'GNGINNet',
     'GraphUNetNodeClassifier',
     'ReGNodeClassifier',
     'TopKPoolClassifier',

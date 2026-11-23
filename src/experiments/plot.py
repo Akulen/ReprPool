@@ -222,7 +222,7 @@ def plot_average(
     if x_max is not None:
         X_ref = X_ref[X_ref <= x_max]
         Y = Y[:,:len(X_ref)]
-    
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         Y_mean = np.nanmean(Y, axis=0)
@@ -288,7 +288,7 @@ def plot(
         }
     }
     set_ci_alpha = {
-        'train_losses': 
+        'train_losses':
             0.3 if (
                     not plot_args.focus_valid
                 and not plot_args.focus_test
@@ -440,12 +440,12 @@ def plot(
                     label,
                     np.array([
                         [
-                            t * run['n_gpus']
+                            t * run.get('n_gpus', -1)
                             for t in run['epoch_time']
                         ]
                         for _, run in runs
                     ]),
-                    [run['n_gpus'] for _, run in runs]
+                    [run.get('n_gpus', -1) for _, run in runs]
                 ))
             runs = grouped_runs
         else:
@@ -474,7 +474,6 @@ def plot(
                 for r in tmp_r
             ])
             et = ets.mean()
-            print(ets.shape)
             # if plot_args.average_runs and label[:7] == 'Cluster':
             #     print(f'Warning, [{label}] cheats!')
             #     if loss == 'accuracy':

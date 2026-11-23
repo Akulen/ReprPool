@@ -2,7 +2,8 @@ from abc import ABC
 from functools import partial
 import random
 import time
-import torch
+from jax._src.api_util import InternalFloatingPointError
+lazy import torch
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -15,10 +16,6 @@ SEED = 42
 random.seed(SEED)
 np.random.seed(SEED)
 
-torch.manual_seed(SEED)
-torch.cuda.manual_seed(SEED)
-torch.cuda.manual_seed_all(SEED)
-
 from ggnn.data.types import BatchedData, BatchedSample
 from ggnn.training import StepFN, Trainer
 from ggnn.node_training import NodeTrainer
@@ -27,7 +24,7 @@ class Dataset(ABC):
     n_samples: int
     samples: BatchedSample
     global_data: Tuple[BatchedData, ...]
-    trainer: Optional[Trainer]=None
+    trainer: Optional[Trainer|NodeTrainer]=None
     step_fn=None
     scan_fn={}
     compiled=set()
@@ -42,6 +39,11 @@ class Dataset(ABC):
         seed: int=42,
         verbose: bool=False
     ):
+        # Potential non-determinism issue here, due to dataset caching
+        torch.manual_seed(SEED)
+        torch.cuda.manual_seed(SEED)
+        torch.cuda.manual_seed_all(SEED)
+
         self.self_init()
 
         self.n_class = n_class
@@ -207,13 +209,16 @@ class Dataset(ABC):
         key: PRNGKeyArray,
         batch_size: int=32,
         custom_loss: bool=False,
-        lr_scale: Float[Array, ""]=jnp.array(1.0)
+        lr_scale: Float[Array, ""] | float=1.0
     ) -> Tuple[
         Tuple[eqx.Module, eqx.nn.State, Any, PRNGKeyArray],
         Float[Array, "L n_batches"]
     ]:
         if self.step_fn is None:
             raise ValueError("step_fn is not set")
+
+        if isinstance(lr_scale, (float, int)):
+            lr_scale = jnp.array(lr_scale)
 
         batches = self.make_batches(batch_size)
         batch_size = batches.target.shape[1]
@@ -226,12 +231,20 @@ class Dataset(ABC):
                 RuntimeWarning
             )
 
-        (
-            (params, state, opt_state, _, _, key), (outputs, ys)
-        ) = self.scan_fn[batch_size](
-            init=(params, state, opt_state, lr_scale, self.global_data, key),
-            xs=batches
-        )
+        try:
+            (
+                (params, state, opt_state, _, _, key), (outputs, ys)
+            ) = self.scan_fn[batch_size](
+                init=(params, state, opt_state, lr_scale, self.global_data, key),
+                xs=batches
+            )
+        except InternalFloatingPointError as e:
+            carry = (params, state, opt_state, lr_scale, self.global_data, key)
+            carry, _ = self.step_fn(carry, batches[0])
+            print()
+            print(e)
+            import sys
+            sys.exit()
         ys = ys.reshape((-1, 2))
         outputs = outputs.T
 

@@ -1,14 +1,17 @@
+import equinox as eqx
 import jax
 import jax.numpy as jnp
-import equinox as eqx
+import logging
 from typing import List, Literal, Optional, Tuple
 from jaxtyping import Array, Float, Int, PRNGKeyArray
+
+logger = logging.getLogger(__name__)
 
 from ggnn.data.types import Graph
 from ggnn.models.utils import BatchNorm
 from ggnn.models.gnn.types import GNNLayer, PoolLayer
-from ggnn.models.gnn.classifier import GNNClassifier
-from ggnn.models.gnn.pooling import GlobalAddPool, GlobalReprPool
+# from ggnn.models.gnn.classifier import GNNClassifier
+from ggnn.models.gnn.pooling import GlobalAddPool, GlobalMaxPool, GlobalReprPool
 from ggnn.models.gnn.mlp import MLP
 
 class GINLayer(GNNLayer):
@@ -105,31 +108,31 @@ class GINLayer(GNNLayer):
 
         return eqx.tree_at(lambda g: g.f_node, graph, x), state
 
-class GINClassifier(GNNClassifier):
-    def __init__(
-        self,
-        key: PRNGKeyArray,
-        d_model: int=64,
-        n_gnn_layers: int=2,
-        pooling: Literal['add']='add',
-        dropout: float=0.5,
-        mlp_depth: int=2,
-        self_edge: bool=True,
-        fixed_mlp: bool=False,
-        use_ln: bool=False
-    ):
-        raise NotImplementedError
-        super().__init__(
-            key,
-            lambda k: GINLayer(
-                k, d_model, mlp_depth, self_edge=self_edge, fixed_mlp=fixed_mlp
-            ),
-            d_model,
-            n_gnn_layers,
-            pooling,
-            dropout,
-            use_ln
-        )
+# class GINClassifier(GNNClassifier):
+#     def __init__(
+#         self,
+#         key: PRNGKeyArray,
+#         d_model: int=64,
+#         n_gnn_layers: int=2,
+#         pooling: Literal['add']='add',
+#         dropout: float=0.5,
+#         mlp_depth: int=2,
+#         self_edge: bool=True,
+#         fixed_mlp: bool=False,
+#         use_ln: bool=False
+#     ):
+#         raise NotImplementedError
+#         super().__init__(
+#             key,
+#             lambda k: GINLayer(
+#                 k, d_model, mlp_depth, self_edge=self_edge, fixed_mlp=fixed_mlp
+#             ),
+#             d_model,
+#             n_gnn_layers,
+#             pooling,
+#             dropout,
+#             use_ln
+#         )
 
 class GINNet(eqx.Module):
     n_classes: int=eqx.field(static=True)
@@ -171,8 +174,8 @@ class GINNet(eqx.Module):
             GINLayer(
                 key=subkey,
                 d_model=d_model,
-                layer_hook=layer_hook,
-                hook_args=hook_args,
+                layer_hook='DefaultHook' if i == 0 else layer_hook,
+                hook_args={} if i == 0 else hook_args,
                 mlp_depth=n_mlp_layers,
                 aggr_type=neighbor_aggr_type,
                 dropout=dropout,
@@ -180,7 +183,7 @@ class GINNet(eqx.Module):
                 residual=residual,
                 learn_eps=learn_eps
             )
-            for subkey in keys_gin
+            for i, subkey in enumerate(keys_gin)
         ]
 
         keys_lin = jax.random.split(key_lin, n_layers + 1)
@@ -198,6 +201,8 @@ class GINNet(eqx.Module):
                 self.pool = GlobalAddPool(key)
             case 'repr':
                 self.pool = GlobalReprPool(key, d_model)
+            case 'max':
+                self.pool = GlobalMaxPool(key)
             case _:
                 raise ValueError(f'Pool type {readout} not supported')
 
